@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getProducts } from '@/lib/api/products';
+import { getProducts, searchProducts } from '@/lib/api/products';
 import { logoutUser, isLoggedIn } from '@/lib/auth';
 import {
   calculateSkip,
@@ -10,10 +10,13 @@ import {
   getPaginationInfo,
   validatePageNumber,
   validateLimit,
-  VALID_LIMITS,
+  debounceSearch,
+  isLatestRequest,
+  resetRequestId,
 } from '@/lib/utils';
 import ProductTable from '@/components/ProductTable';
 import ProductCard from '@/components/ProductCard';
+import SearchBar from '@/components/SearchBar';
 import Pagination from '@/components/Pagination';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorState from '@/components/ErrorState';
@@ -26,48 +29,74 @@ export default function ProductsPage() {
   // Get URL params
   const urlPage = searchParams.get('page') || '1';
   const urlLimit = searchParams.get('limit') || '10';
+  const urlSearch = searchParams.get('search') || '';
 
-  // Validate URL params
+  // State
   const [limit, setLimit] = useState(() => validateLimit(urlLimit));
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(urlSearch);
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Track latest search request
+  const latestSearchRequestId = useRef(null);
+  const debouncedSearch = useRef(null);
+
   // Initialize page from URL
   useEffect(() => {
+    console.log('ProductsPage mounted');
+
     if (!isLoggedIn()) {
       router.push('/login');
       return;
     }
 
-    // Validate and set page
-    const validPage = validatePageNumber(parseInt(urlPage, 10), 100); // Assume max 100 pages
+    resetRequestId(); // Reset for fresh start
+    const validPage = validatePageNumber(parseInt(urlPage, 10), 100);
     setPage(validPage);
+    setSearch(urlSearch);
   }, [router]);
+
+  // Initialize debounce function ONCE
+  useEffect(() => {
+    debouncedSearch.current = debounceSearch((requestId, newSearch) => {
+      console.log(`Debounce complete for request ${requestId}: "${newSearch}"`);
+
+      latestSearchRequestId.current = requestId;
+
+      router.push(
+        `/products?search=${encodeURIComponent(newSearch)}&page=1&limit=${limit}`
+      );
+      setPage(1);
+      setSearch(newSearch);
+    }, 500);
+  }, [limit, router]);
 
   // Fetch products when page or limit changes
   useEffect(() => {
-    if (page === 0) return; // Wait for page to initialize
-    fetchProducts();
-  }, [page, limit]);
+    if (page === 0) return;
 
-  // Fetch products function
+    console.log(`Fetching: page=${page}, limit=${limit}, search=${search}`);
+
+    if (search) {
+      // Search API call
+      fetchSearchResults();
+    } else {
+      // Regular products API call
+      fetchProducts();
+    }
+  }, [page, limit, search]);
+
+  // Fetch regular products
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError('');
 
-      console.log(`Fetching page ${page}, limit ${limit}`);
-
-      // Calculate skip value
       const skip = calculateSkip(page, limit);
-
-      // Call API
       const response = await getProducts(limit, skip);
-
-      console.log(`Received ${response.products.length} products, total: ${response.total}`);
 
       setProducts(response.products || []);
       setTotal(response.total || 0);
@@ -79,24 +108,54 @@ export default function ProductsPage() {
     }
   };
 
+  // Fetch search results
+  const fetchSearchResults = async (requestId) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const skip = calculateSkip(page, limit);
+      const response = await searchProducts(search, limit, skip);
+
+      // Check if this is still the latest request
+      if (requestId && !isLatestRequest(requestId, latestSearchRequestId.current)) {
+        console.log(`Ignoring old search request ${requestId}`);
+        return;
+      }
+
+      setProducts(response.products || []);
+      setTotal(response.total || 0);
+    } catch (err) {
+      console.error('Error searching products:', err);
+      setError(err.message || 'Failed to search products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (newSearch) => {
+    console.log(`User typed: "${newSearch}"`);
+
+    // Call debounced search
+    debouncedSearch.current(newSearch);
+  };
+
   // Handle page change
   const handlePageChange = (newPage) => {
     console.log(`Changing to page ${newPage}`);
-    
-    // Update URL
-    router.push(`/products?page=${newPage}&limit=${limit}`);
-    
-    // Update state (triggers useEffect)
+    router.push(
+      `/products?search=${encodeURIComponent(search)}&page=${newPage}&limit=${limit}`
+    );
     setPage(newPage);
   };
 
   // Handle limit change
   const handleLimitChange = (newLimit) => {
     console.log(`Changing limit to ${newLimit}`);
-    
-    // Reset to page 1 when changing limit
-    router.push(`/products?page=1&limit=${newLimit}`);
-    
+    router.push(
+      `/products?search=${encodeURIComponent(search)}&page=1&limit=${newLimit}`
+    );
     setPage(1);
     setLimit(newLimit);
   };
@@ -116,7 +175,7 @@ export default function ProductsPage() {
   // Calculate pagination info
   const totalPages = calculateTotalPages(total, limit);
   const validPage = validatePageNumber(page, totalPages);
-  
+
   const paginationInfo = getPaginationInfo(
     validPage,
     limit,
@@ -133,6 +192,7 @@ export default function ProductsPage() {
             <h1 className="text-3xl font-bold text-gray-800">Products</h1>
             <p className="text-gray-600 mt-1">
               Total: {total} products
+              {search && <span> matching "{search}"</span>}
             </p>
           </div>
           <button
@@ -143,17 +203,34 @@ export default function ProductsPage() {
           </button>
         </div>
 
+        {/* Search Bar */}
+        <SearchBar
+          value={search}
+          onChange={handleSearchChange}
+          isLoading={loading}
+          placeholder="Search products by name, brand, category..."
+        />
+
         {/* Loading State */}
         {loading && <LoadingSpinner />}
 
         {/* Error State */}
         {!loading && error && (
-          <ErrorState error={error} onRetry={fetchProducts} />
+          <ErrorState
+            error={error}
+            onRetry={() => {
+              if (search) {
+                fetchSearchResults(latestSearchRequestId.current);
+              } else {
+                fetchProducts();
+              }
+            }}
+          />
         )}
 
         {/* Empty State */}
         {!loading && !error && products.length === 0 && (
-          <EmptyState />
+          <EmptyState searchQuery={search} />
         )}
 
         {/* Products - Desktop Table */}

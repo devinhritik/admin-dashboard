@@ -11,7 +11,7 @@ export default function EmptyState({ searchQuery }) {
         </h3>
         <p className="text-gray-600 text-sm">
           {searchQuery 
-            ? `We couldn't find any products matching "${searchQuery}". Try a different search term.`
+            ? `We couldn't find any products matching "${searchQuery}". Try a different search term or browse all products.`
             : 'There are no products to display.'}
         </p>
       </div>
