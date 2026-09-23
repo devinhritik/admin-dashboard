@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 
 export default function ProductCard({ product, onProductClick }) {
@@ -10,9 +11,11 @@ export default function ProductCard({ product, onProductClick }) {
     >
       {/* Image Container */}
       <div className="relative bg-gray-200 h-48 overflow-hidden">
-        <img
+        <Image
           src={product.thumbnail}
           alt={product.title}
+          width={400}
+          height={240}
           className="w-full h-full object-cover hover:scale-105 transition duration-200"
         />
         {/* Category Badge */}

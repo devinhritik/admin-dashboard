@@ -1,25 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation'; // Next.js navigation
+import { useRouter } from 'next/navigation';
 import { isLoggedIn, getToken } from '@/lib/auth';
 
 export const useAuth = () => {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [token, setToken] = useState(null);
+  const [isAuthenticated] = useState(() => isLoggedIn());
+  const [token] = useState(() => getToken());
+  const [isLoading] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in
-    const authenticated = isLoggedIn();
-    setIsAuthenticated(authenticated);
-    setToken(getToken());
-    setIsLoading(false);
-
-    // If not authenticated, redirect to login
-    if (!authenticated) {
+    if (!isAuthenticated) {
       router.push('/login');
     }
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   return {
     isAuthenticated,

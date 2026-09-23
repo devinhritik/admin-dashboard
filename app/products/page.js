@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getProducts, searchProducts } from '@/lib/api/products';
+import {
+  getProducts,
+  searchProducts,
+  getCategories,
+  getProductsByCategory,
+} from '@/lib/api/products';
 import { logoutUser, isLoggedIn } from '@/lib/auth';
 import {
   calculateSkip,
@@ -13,90 +18,69 @@ import {
   debounceSearch,
   isLatestRequest,
   resetRequestId,
+  sortProducts,
+  validateSort,
 } from '@/lib/utils';
 import ProductTable from '@/components/ProductTable';
 import ProductCard from '@/components/ProductCard';
 import SearchBar from '@/components/SearchBar';
+import FilterSort from '@/components/FilterSort';
 import Pagination from '@/components/Pagination';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorState from '@/components/ErrorState';
 import EmptyState from '@/components/EmptyState';
 
-export default function ProductsPage() {
+function ProductsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Get URL params
   const urlPage = searchParams.get('page') || '1';
   const urlLimit = searchParams.get('limit') || '10';
   const urlSearch = searchParams.get('search') || '';
+  const urlCategory = searchParams.get('category') || '';
+  const urlSort = searchParams.get('sort') || 'none';
 
-  // State
   const [limit, setLimit] = useState(() => validateLimit(urlLimit));
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => validatePageNumber(parseInt(urlPage, 10), 100));
   const [search, setSearch] = useState(urlSearch);
+  const [category, setCategory] = useState(urlCategory);
+  const [sort, setSort] = useState(() => validateSort(urlSort));
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Track latest search request
   const latestSearchRequestId = useRef(null);
   const debouncedSearch = useRef(null);
 
-  // Initialize page from URL
-  useEffect(() => {
-    console.log('ProductsPage mounted');
+  const fetchCategories = useCallback(async () => {
+    try {
+      const data = await getCategories();
+      const normalizedCategories = Array.isArray(data)
+        ? data.map((item) => {
+            if (typeof item === 'string') return item;
+            return item?.slug || item?.name || '';
+          }).filter(Boolean)
+        : [];
 
-    if (!isLoggedIn()) {
-      router.push('/login');
-      return;
+      setCategories(normalizedCategories);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
     }
+  }, []);
 
-    resetRequestId(); // Reset for fresh start
-    const validPage = validatePageNumber(parseInt(urlPage, 10), 100);
-    setPage(validPage);
-    setSearch(urlSearch);
-  }, [router]);
-
-  // Initialize debounce function ONCE
-  useEffect(() => {
-    debouncedSearch.current = debounceSearch((requestId, newSearch) => {
-      console.log(`Debounce complete for request ${requestId}: "${newSearch}"`);
-
-      latestSearchRequestId.current = requestId;
-
-      router.push(
-        `/products?search=${encodeURIComponent(newSearch)}&page=1&limit=${limit}`
-      );
-      setPage(1);
-      setSearch(newSearch);
-    }, 500);
-  }, [limit, router]);
-
-  // Fetch products when page or limit changes
-  useEffect(() => {
-    if (page === 0) return;
-
-    console.log(`Fetching: page=${page}, limit=${limit}, search=${search}`);
-
-    if (search) {
-      // Search API call
-      fetchSearchResults();
-    } else {
-      // Regular products API call
-      fetchProducts();
-    }
-  }, [page, limit, search]);
-
-  // Fetch regular products
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
       const skip = calculateSkip(page, limit);
       const response = await getProducts(limit, skip);
+
+      if (sort !== 'none') {
+        response.products = sortProducts(response.products, sort);
+      }
 
       setProducts(response.products || []);
       setTotal(response.total || 0);
@@ -106,10 +90,31 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page, sort]);
 
-  // Fetch search results
-  const fetchSearchResults = async (requestId) => {
+  const fetchCategoryProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const skip = calculateSkip(page, limit);
+      const response = await getProductsByCategory(category, limit, skip);
+
+      if (sort !== 'none') {
+        response.products = sortProducts(response.products, sort);
+      }
+
+      setProducts(response.products || []);
+      setTotal(response.total || 0);
+    } catch (err) {
+      console.error('Error fetching category products:', err);
+      setError(err.message || 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  }, [category, limit, page, sort]);
+
+  const fetchSearchResults = useCallback(async (requestId) => {
     try {
       setLoading(true);
       setError('');
@@ -117,10 +122,12 @@ export default function ProductsPage() {
       const skip = calculateSkip(page, limit);
       const response = await searchProducts(search, limit, skip);
 
-      // Check if this is still the latest request
       if (requestId && !isLatestRequest(requestId, latestSearchRequestId.current)) {
-        console.log(`Ignoring old search request ${requestId}`);
         return;
+      }
+
+      if (sort !== 'none') {
+        response.products = sortProducts(response.products, sort);
       }
 
       setProducts(response.products || []);
@@ -131,68 +138,130 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page, search, sort]);
 
-  // Handle search input change
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
+
+    resetRequestId();
+
+    const timer = setTimeout(() => {
+      void fetchCategories();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [fetchCategories, router]);
+
+  useEffect(() => {
+    debouncedSearch.current = debounceSearch((requestId, newSearch) => {
+      latestSearchRequestId.current = requestId;
+
+      router.push(
+        `/products?search=${encodeURIComponent(newSearch)}&page=1&limit=${limit}&sort=${sort}`
+      );
+      setPage(1);
+      setSearch(newSearch);
+      setCategory('');
+    }, 500);
+  }, [limit, router, sort]);
+
+  useEffect(() => {
+    if (page === 0) return;
+
+    if (search) {
+      fetchSearchResults(latestSearchRequestId.current);
+    } else if (category) {
+      fetchCategoryProducts();
+    } else {
+      fetchProducts();
+    }
+  }, [category, fetchCategoryProducts, fetchProducts, fetchSearchResults, page, search]);
+
   const handleSearchChange = (newSearch) => {
-    console.log(`User typed: "${newSearch}"`);
+    if (newSearch === '') {
+      router.push(`/products?page=1&limit=${limit}&sort=${sort}`);
+      setPage(1);
+      setSearch('');
+      setCategory('');
+      return;
+    }
 
-    // Call debounced search
     debouncedSearch.current(newSearch);
   };
 
-  // Handle page change
-  const handlePageChange = (newPage) => {
-    console.log(`Changing to page ${newPage}`);
+  const handleCategoryChange = (newCategory) => {
     router.push(
-      `/products?search=${encodeURIComponent(search)}&page=${newPage}&limit=${limit}`
+      `/products?category=${newCategory}&page=1&limit=${limit}&sort=${sort}`
     );
+    setPage(1);
+    setCategory(newCategory);
+  };
+
+  const handleSortChange = (newSort) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (category) params.append('category', category);
+    params.append('sort', newSort);
+    params.append('page', '1');
+    params.append('limit', limit);
+
+    router.push(`/products?${params.toString()}`);
+    setPage(1);
+    setSort(newSort);
+  };
+
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (category) params.append('category', category);
+    params.append('page', newPage);
+    params.append('limit', limit);
+    params.append('sort', sort);
+
+    router.push(`/products?${params.toString()}`);
     setPage(newPage);
   };
 
-  // Handle limit change
   const handleLimitChange = (newLimit) => {
-    console.log(`Changing limit to ${newLimit}`);
-    router.push(
-      `/products?search=${encodeURIComponent(search)}&page=1&limit=${newLimit}`
-    );
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (category) params.append('category', category);
+    params.append('page', '1');
+    params.append('limit', newLimit);
+    params.append('sort', sort);
+
+    router.push(`/products?${params.toString()}`);
     setPage(1);
     setLimit(newLimit);
   };
 
-  // Handle product click
   const handleProductClick = (id) => {
     router.push(`/products/${id}`);
   };
 
-  // Handle logout
   const handleLogout = () => {
     logoutUser();
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
     router.push('/login');
   };
 
-  // Calculate pagination info
   const totalPages = calculateTotalPages(total, limit);
   const validPage = validatePageNumber(page, totalPages);
-
-  const paginationInfo = getPaginationInfo(
-    validPage,
-    limit,
-    total,
-    products.length
-  );
+  const paginationInfo = getPaginationInfo(validPage, limit, total, products.length);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-4">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Products</h1>
             <p className="text-gray-600 mt-1">
               Total: {total} products
-              {search && <span> matching "{search}"</span>}
+              {search && <span> matching &lsquo;{search}&rsquo;</span>}
+              {category && <span> in {category}</span>}
             </p>
           </div>
           <button
@@ -203,7 +272,6 @@ export default function ProductsPage() {
           </button>
         </div>
 
-        {/* Search Bar */}
         <SearchBar
           value={search}
           onChange={handleSearchChange}
@@ -211,16 +279,26 @@ export default function ProductsPage() {
           placeholder="Search products by name, brand, category..."
         />
 
-        {/* Loading State */}
+        <FilterSort
+          categories={categories}
+          selectedCategory={category}
+          selectedSort={sort}
+          onCategoryChange={handleCategoryChange}
+          onSortChange={handleSortChange}
+          isLoading={loading}
+          isSearching={!!search}
+        />
+
         {loading && <LoadingSpinner />}
 
-        {/* Error State */}
         {!loading && error && (
           <ErrorState
             error={error}
             onRetry={() => {
               if (search) {
                 fetchSearchResults(latestSearchRequestId.current);
+              } else if (category) {
+                fetchCategoryProducts();
               } else {
                 fetchProducts();
               }
@@ -228,12 +306,10 @@ export default function ProductsPage() {
           />
         )}
 
-        {/* Empty State */}
         {!loading && !error && products.length === 0 && (
           <EmptyState searchQuery={search} />
         )}
 
-        {/* Products - Desktop Table */}
         {!loading && !error && products.length > 0 && (
           <div className="hidden md:block">
             <ProductTable
@@ -243,7 +319,6 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Products - Mobile Cards */}
         {!loading && !error && products.length > 0 && (
           <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
             {products.map((product) => (
@@ -256,7 +331,6 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && !error && products.length > 0 && (
           <Pagination
             currentPage={validPage}
@@ -272,5 +346,13 @@ export default function ProductsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ProductsPageContent />
+    </Suspense>
   );
 }

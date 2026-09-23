@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 
 export default function ProductTable({ products, onProductClick }) {
@@ -29,9 +30,11 @@ export default function ProductTable({ products, onProductClick }) {
             >
               {/* Image Cell */}
               <td className="px-6 py-4">
-                <img
+                <Image
                   src={product.thumbnail}
                   alt={product.title}
+                  width={48}
+                  height={48}
                   className="w-12 h-12 object-cover rounded"
                 />
               </td>
