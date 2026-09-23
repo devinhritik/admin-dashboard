@@ -51,7 +51,7 @@ export default function Pagination({
             value={limit}
             onChange={(e) => onLimitChange(parseInt(e.target.value))}
             disabled={isLoading}
-            className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
+            className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 text-gray-900 bg-white"
           >
             <option value="10">10</option>
             <option value="20">20</option>
@@ -66,7 +66,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={!hasPrevPage || isLoading}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition text-sm font-medium"
+          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition text-sm font-medium text-gray-800 bg-white"
         >
           ← Previous
         </button>
@@ -77,7 +77,7 @@ export default function Pagination({
             <button
               onClick={() => onPageChange(1)}
               disabled={isLoading}
-              className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium"
+              className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium text-gray-800 bg-white"
             >
               1
             </button>
@@ -96,7 +96,7 @@ export default function Pagination({
             className={`px-3 py-2 border rounded text-sm font-medium transition ${
               pageNum === currentPage
                 ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-gray-300 hover:bg-gray-50'
+                : 'border-gray-300 hover:bg-gray-50 text-gray-800 bg-white'
             } disabled:cursor-not-allowed`}
           >
             {pageNum}
@@ -112,7 +112,7 @@ export default function Pagination({
             <button
               onClick={() => onPageChange(totalPages)}
               disabled={isLoading}
-              className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium"
+              className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium text-gray-800 bg-white"
             >
               {totalPages}
             </button>
@@ -123,7 +123,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={!hasNextPage || isLoading}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition text-sm font-medium"
+          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition text-sm font-medium text-gray-800 bg-white"
         >
           Next →
         </button>
