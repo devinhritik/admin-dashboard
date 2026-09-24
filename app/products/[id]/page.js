@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getProductById } from '@/lib/api/products';
 import { logoutUser, isLoggedIn } from '@/lib/auth';
@@ -21,18 +21,7 @@ export default function ProductDetailsPage() {
   const [error, setError] = useState('');
   const [notFound, setNotFound] = useState(false);
 
-  // Check auth on mount
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      router.push('/login');
-      return;
-    }
-
-    fetchProduct();
-  }, [productId, router]);
-
-  // Fetch product details
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -52,7 +41,6 @@ export default function ProductDetailsPage() {
     } catch (err) {
       console.error('Error fetching product:', err);
 
-      // 404 error
       if (err.response?.status === 404) {
         setNotFound(true);
       } else {
@@ -61,7 +49,17 @@ export default function ProductDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [productId]);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProduct();
+  }, [fetchProduct, router]);
 
   // Handle logout
   const handleLogout = () => {

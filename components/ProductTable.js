@@ -1,14 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
+import ProductActions from './ProductActions';
 
-export default function ProductTable({ products, onProductClick }) {
+export default function ProductTable({ products, onProductClick, onEdit, onDelete, isLoading }) {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      {/* Table */}
       <table className="w-full">
-        {/* Table Header */}
         <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Image</th>
@@ -17,50 +15,51 @@ export default function ProductTable({ products, onProductClick }) {
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Price</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rating</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Stock</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
           </tr>
         </thead>
 
-        {/* Table Body */}
         <tbody>
           {products.map((product) => (
             <tr
               key={product.id}
-              onClick={() => onProductClick(product.id)}
-              className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition"
+              className="border-b border-gray-200 hover:bg-gray-50 transition"
             >
-              {/* Image Cell */}
+              {/* Image */}
               <td className="px-6 py-4">
-                <Image
+                <img
                   src={product.thumbnail}
                   alt={product.title}
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 object-cover rounded"
+                  className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+                  onClick={() => onProductClick(product.id)}
                 />
               </td>
 
-              {/* Title Cell */}
+              {/* Title */}
               <td className="px-6 py-4">
-                <p className="text-sm font-medium text-gray-800 truncate max-w-xs">
+                <p
+                  className="text-sm font-medium text-gray-800 truncate max-w-xs cursor-pointer hover:text-blue-600"
+                  onClick={() => onProductClick(product.id)}
+                >
                   {product.title}
                 </p>
               </td>
 
-              {/* Category Cell */}
+              {/* Category */}
               <td className="px-6 py-4">
                 <span className="text-sm text-gray-600 capitalize">
                   {product.category}
                 </span>
               </td>
 
-              {/* Price Cell */}
+              {/* Price */}
               <td className="px-6 py-4">
                 <span className="text-sm font-semibold text-gray-800">
                   {formatPrice(product.price)}
                 </span>
               </td>
 
-              {/* Rating Cell */}
+              {/* Rating */}
               <td className="px-6 py-4">
                 <div className="flex items-center">
                   <span className="text-sm text-gray-800">{product.rating}</span>
@@ -68,7 +67,7 @@ export default function ProductTable({ products, onProductClick }) {
                 </div>
               </td>
 
-              {/* Stock Cell */}
+              {/* Stock */}
               <td className="px-6 py-4">
                 <span
                   className={`text-sm font-medium px-2 py-1 rounded ${
@@ -79,6 +78,16 @@ export default function ProductTable({ products, onProductClick }) {
                 >
                   {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
                 </span>
+              </td>
+
+              {/* Actions */}
+              <td className="px-6 py-4">
+                <ProductActions
+                  product={product}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  isLoading={isLoading}
+                />
               </td>
             </tr>
           ))}

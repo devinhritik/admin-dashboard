@@ -18,8 +18,7 @@ export default function DeleteConfirm({
           <div className="text-red-600 text-4xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Delete Product?</h2>
           <p className="text-gray-600 mb-6">
-            Are you sure you want to delete <strong>&quot;{productName}&quot;</strong>? This action cannot be
-            undone.
+            Are you sure you want to delete <strong>{`"${productName}"`}</strong>? This action cannot be undone.
           </p>
 
           {/* Buttons */}

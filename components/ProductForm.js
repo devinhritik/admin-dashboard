@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { validateProductForm, sanitizeProductData } from '@/lib/validation';
+import {
+  validateProductForm,
+  sanitizeProductData,
+} from '@/lib/validation';
 
-const createInitialFormData = (initialData) => ({
+const createDefaultFormData = (initialData = null) => ({
   title: initialData?.title || '',
   description: initialData?.description || '',
   price: initialData?.price?.toString() || '',
@@ -22,19 +25,20 @@ export default function ProductForm({
   initialData = null,
   categories = [],
 }) {
-  const [formData, setFormData] = useState(() => createInitialFormData(initialData));
+  const [formData, setFormData] = useState(() =>
+    createDefaultFormData(initialData)
+  );
 
   const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
 
-  // Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-    // Clear error for this field
+
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -43,129 +47,130 @@ export default function ProductForm({
     }
   };
 
-  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
 
-    // Validate
-    const { isValid, errors: validationErrors } = validateProductForm(formData);
+    const { isValid, errors: validationErrors } =
+      validateProductForm(formData);
+
     if (!isValid) {
       setErrors(validationErrors);
       return;
     }
 
-    // Sanitize data
     const sanitized = sanitizeProductData(formData);
 
-    // Call parent submit
     await onSubmit(sanitized);
 
-    // Close modal
     onClose();
   };
 
-  // Handle close
   const handleClose = () => {
-    setFormData({
-      title: '',
-      description: '',
-      price: '',
-      stock: '',
-      category: '',
-      rating: '',
-      brand: '',
-      thumbnail: '',
-    });
+    setFormData(createDefaultFormData());
     setErrors({});
-    setSubmitted(false);
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    // Modal Overlay
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-white">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b">
+        <div className="flex items-center justify-between border-b p-6">
           <h2 className="text-2xl font-bold text-gray-800">
             {initialData ? 'Edit Product' : 'Add New Product'}
           </h2>
+
           <button
+            type="button"
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className="text-2xl text-gray-400 hover:text-gray-600"
           >
             ✕
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Title *
             </label>
+
             <input
               type="text"
               name="title"
               value={formData.title}
               onChange={handleChange}
               placeholder="Product title"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+
             {errors.title && (
-              <p className="text-red-600 text-sm mt-1">{errors.title}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.title}
+              </p>
             )}
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Description *
             </label>
+
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               placeholder="Product description"
-              rows="3"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+
             {errors.description && (
-              <p className="text-red-600 text-sm mt-1">{errors.description}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.description}
+              </p>
             )}
           </div>
 
-          {/* Price & Stock Row */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Price & Stock */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Price */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Price *
               </label>
+
               <input
                 type="number"
                 name="price"
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="0.00"
-                step="0.01"
                 min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                step="0.01"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+
               {errors.price && (
-                <p className="text-red-600 text-sm mt-1">{errors.price}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.price}
+                </p>
               )}
             </div>
 
             {/* Stock */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Stock *
               </label>
+
               <input
                 type="number"
                 name="stock"
@@ -173,44 +178,70 @@ export default function ProductForm({
                 onChange={handleChange}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+
               {errors.stock && (
-                <p className="text-red-600 text-sm mt-1">{errors.stock}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.stock}
+                </p>
               )}
             </div>
           </div>
 
-          {/* Category & Rating Row */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Category & Rating */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Category *
               </label>
+
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select category</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </option>
-                ))}
+
+                {Array.isArray(categories) &&
+                  categories.map((cat) => {
+                    const categoryValue =
+                      typeof cat === 'string' ? cat : cat?.name;
+
+                    if (!categoryValue) {
+                      return null;
+                    }
+
+                    const categoryLabel =
+                      categoryValue.charAt(0).toUpperCase() +
+                      categoryValue.slice(1);
+
+                    return (
+                      <option
+                        key={categoryValue}
+                        value={categoryValue}
+                      >
+                        {categoryLabel}
+                      </option>
+                    );
+                  })}
               </select>
+
               {errors.category && (
-                <p className="text-red-600 text-sm mt-1">{errors.category}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.category}
+                </p>
               )}
             </div>
 
             {/* Rating */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Rating
               </label>
+
               <input
                 type="number"
                 name="rating"
@@ -220,60 +251,66 @@ export default function ProductForm({
                 min="0"
                 max="5"
                 step="0.1"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+
               {errors.rating && (
-                <p className="text-red-600 text-sm mt-1">{errors.rating}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.rating}
+                </p>
               )}
             </div>
           </div>
 
-          {/* Brand & Thumbnail Row */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Brand & Thumbnail */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Brand */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Brand
               </label>
+
               <input
                 type="text"
                 name="brand"
                 value={formData.brand}
                 onChange={handleChange}
                 placeholder="Product brand"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {/* Thumbnail */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Thumbnail URL
               </label>
+
               <input
-                type="text"
+                type="url"
                 name="thumbnail"
                 value={formData.thumbnail}
                 onChange={handleChange}
                 placeholder="https://..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-3 mt-6 pt-4 border-t">
+          <div className="flex gap-3 border-t pt-4">
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-50"
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {isLoading ? 'Saving...' : 'Save Product'}
             </button>
@@ -283,3 +320,4 @@ export default function ProductForm({
     </div>
   );
 }
+

@@ -14,7 +14,7 @@ export default function NotFound({ productId }) {
         {/* Message */}
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Product Not Found</h1>
         <p className="text-gray-600 mb-4">
-          The product with ID <code className="bg-gray-200 px-2 py-1 rounded">{productId}</code> doesn't
+          The product with ID <code className="bg-gray-200 px-2 py-1 rounded">{productId}</code> does not
           exist or has been removed.
         </p>
 
