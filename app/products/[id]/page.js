@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getProductById } from '@/lib/api/products';
@@ -79,9 +80,11 @@ export default function ProductDetailPage() {
 
         <div className="grid md:grid-cols-2 gap-8 p-6">
           <div className="bg-gray-100 rounded-xl overflow-hidden">
-            <img
+            <Image
               src={product.thumbnail}
               alt={product.title}
+              width={900}
+              height={600}
               className="w-full h-full object-cover min-h-[320px]"
             />
           </div>
