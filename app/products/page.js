@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getProducts,
@@ -34,14 +34,16 @@ function ProductsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Get URL params
   const urlPage = searchParams.get('page') || '1';
   const urlLimit = searchParams.get('limit') || '10';
   const urlSearch = searchParams.get('search') || '';
   const urlCategory = searchParams.get('category') || '';
   const urlSort = searchParams.get('sort') || 'none';
 
+  // State
   const [limit, setLimit] = useState(() => validateLimit(urlLimit));
-  const [page, setPage] = useState(() => validatePageNumber(parseInt(urlPage, 10), 100));
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState(urlSearch);
   const [category, setCategory] = useState(urlCategory);
   const [sort, setSort] = useState(() => validateSort(urlSort));
@@ -51,33 +53,100 @@ function ProductsPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Track latest search request
   const latestSearchRequestId = useRef(null);
   const debouncedSearch = useRef(null);
 
-  const fetchCategories = useCallback(async () => {
+  // Initialize page from URL
+  useEffect(() => {
+    console.log('ProductsPage mounted');
+
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
+
+    resetRequestId();
+    const validPage = validatePageNumber(parseInt(urlPage, 10), 100);
+    setPage(validPage);
+    setSearch(urlSearch);
+    setCategory(urlCategory);
+    setSort(validateSort(urlSort));
+
+    // Fetch categories
+    fetchCategories();
+  }, [router]);
+
+  // Initialize debounce function
+  useEffect(() => {
+    debouncedSearch.current = debounceSearch((requestId, newSearch) => {
+      console.log(`Debounce complete for request ${requestId}: "${newSearch}"`);
+
+      latestSearchRequestId.current = requestId;
+
+      // When searching, disable category filter
+      router.push(
+        `/products?search=${encodeURIComponent(newSearch)}&page=1&limit=${limit}&sort=${sort}`
+      );
+      setPage(1);
+      setSearch(newSearch);
+      setCategory(''); // Clear category when searching
+    }, 500);
+  }, [limit, sort, router]);
+
+  // Fetch categories
+  
+  const fetchCategories = async () => {
     try {
       const data = await getCategories();
+      console.log('Categories API Response:', data);
+
       const normalizedCategories = Array.isArray(data)
-        ? data.map((item) => {
-            if (typeof item === 'string') return item;
-            return item?.slug || item?.name || '';
-          }).filter(Boolean)
+        ? data
+            .map((item) => {
+              if (typeof item === 'string') return item;
+              return item?.slug || item?.name || item?.value || '';
+            })
+            .filter(Boolean)
         : [];
 
       setCategories(normalizedCategories);
     } catch (err) {
       console.error('Error fetching categories:', err);
+      setCategories([]);
     }
-  }, []);
+  };
 
-  const fetchProducts = useCallback(async () => {
+  // Fetch products when page, limit, search, category, or sort changes
+  useEffect(() => {
+    if (page === 0) return;
+
+    console.log(
+      `Fetching: page=${page}, limit=${limit}, search=${search}, category=${category}, sort=${sort}`
+    );
+
+    if (search) {
+      // Search API call (takes priority over filter)
+      fetchSearchResults();
+    } else if (category) {
+      // Category filter API call
+      fetchCategoryProducts();
+    } else {
+      // Regular products API call
+      fetchProducts();
+    }
+  }, [page, limit, search, category, sort]);
+
+  // Fetch regular products
+  const fetchProducts = async () => {
     try {
       setLoading(true);
       setError('');
 
       const skip = calculateSkip(page, limit);
-      const response = await getProducts(limit, skip);
+      let response = await getProducts(limit, skip);
 
+      // Apply client-side sorting
       if (sort !== 'none') {
         response.products = sortProducts(response.products, sort);
       }
@@ -90,16 +159,18 @@ function ProductsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [limit, page, sort]);
+  };
 
-  const fetchCategoryProducts = useCallback(async () => {
+  // Fetch category products
+  const fetchCategoryProducts = async () => {
     try {
       setLoading(true);
       setError('');
 
       const skip = calculateSkip(page, limit);
-      const response = await getProductsByCategory(category, limit, skip);
+      let response = await getProductsByCategory(category, limit, skip);
 
+      // Apply client-side sorting
       if (sort !== 'none') {
         response.products = sortProducts(response.products, sort);
       }
@@ -112,20 +183,24 @@ function ProductsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [category, limit, page, sort]);
+  };
 
-  const fetchSearchResults = useCallback(async (requestId) => {
+  // Fetch search results
+  const fetchSearchResults = async (requestId) => {
     try {
       setLoading(true);
       setError('');
 
       const skip = calculateSkip(page, limit);
-      const response = await searchProducts(search, limit, skip);
+      let response = await searchProducts(search, limit, skip);
 
+      // Check if this is still the latest request
       if (requestId && !isLatestRequest(requestId, latestSearchRequestId.current)) {
+        console.log(`Ignoring old search request ${requestId}`);
         return;
       }
 
+      // Apply client-side sorting
       if (sort !== 'none') {
         response.products = sortProducts(response.products, sort);
       }
@@ -138,61 +213,27 @@ function ProductsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [limit, page, search, sort]);
+  };
 
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      router.push('/login');
-      return;
-    }
-
-    resetRequestId();
-
-    const timer = setTimeout(() => {
-      void fetchCategories();
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [fetchCategories, router]);
-
-  useEffect(() => {
-    debouncedSearch.current = debounceSearch((requestId, newSearch) => {
-      latestSearchRequestId.current = requestId;
-
-      router.push(
-        `/products?search=${encodeURIComponent(newSearch)}&page=1&limit=${limit}&sort=${sort}`
-      );
-      setPage(1);
-      setSearch(newSearch);
-      setCategory('');
-    }, 500);
-  }, [limit, router, sort]);
-
-  useEffect(() => {
-    if (page === 0) return;
-
-    if (search) {
-      fetchSearchResults(latestSearchRequestId.current);
-    } else if (category) {
-      fetchCategoryProducts();
-    } else {
-      fetchProducts();
-    }
-  }, [category, fetchCategoryProducts, fetchProducts, fetchSearchResults, page, search]);
-
+  // Handle search input change
   const handleSearchChange = (newSearch) => {
+    console.log(`User typed: "${newSearch}"`);
+
     if (newSearch === '') {
+      console.log('Clearing search');
       router.push(`/products?page=1&limit=${limit}&sort=${sort}`);
       setPage(1);
       setSearch('');
-      setCategory('');
       return;
     }
 
     debouncedSearch.current(newSearch);
   };
 
+  // Handle category change
   const handleCategoryChange = (newCategory) => {
+    console.log(`Category changed to: ${newCategory || 'all'}`);
+
     router.push(
       `/products?category=${newCategory}&page=1&limit=${limit}&sort=${sort}`
     );
@@ -200,7 +241,10 @@ function ProductsPageContent() {
     setCategory(newCategory);
   };
 
+  // Handle sort change
   const handleSortChange = (newSort) => {
+    console.log(`Sort changed to: ${newSort}`);
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (category) params.append('category', category);
@@ -213,7 +257,10 @@ function ProductsPageContent() {
     setSort(newSort);
   };
 
+  // Handle page change
   const handlePageChange = (newPage) => {
+    console.log(`Changing to page ${newPage}`);
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (category) params.append('category', category);
@@ -225,7 +272,10 @@ function ProductsPageContent() {
     setPage(newPage);
   };
 
+  // Handle limit change
   const handleLimitChange = (newLimit) => {
+    console.log(`Changing limit to ${newLimit}`);
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (category) params.append('category', category);
@@ -238,29 +288,39 @@ function ProductsPageContent() {
     setLimit(newLimit);
   };
 
+  // Handle product click
   const handleProductClick = (id) => {
     router.push(`/products/${id}`);
   };
 
+  // Handle logout
   const handleLogout = () => {
     logoutUser();
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
     router.push('/login');
   };
 
+  // Calculate pagination info
   const totalPages = calculateTotalPages(total, limit);
   const validPage = validatePageNumber(page, totalPages);
-  const paginationInfo = getPaginationInfo(validPage, limit, total, products.length);
+
+  const paginationInfo = getPaginationInfo(
+    validPage,
+    limit,
+    total,
+    products.length
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-4">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Products</h1>
             <p className="text-gray-600 mt-1">
               Total: {total} products
-              {search && <span> matching &lsquo;{search}&rsquo;</span>}
+              {search && <span> matching "{search}"</span>}
               {category && <span> in {category}</span>}
             </p>
           </div>
@@ -272,6 +332,7 @@ function ProductsPageContent() {
           </button>
         </div>
 
+        {/* Search Bar */}
         <SearchBar
           value={search}
           onChange={handleSearchChange}
@@ -279,6 +340,7 @@ function ProductsPageContent() {
           placeholder="Search products by name, brand, category..."
         />
 
+        {/* Filter & Sort */}
         <FilterSort
           categories={categories}
           selectedCategory={category}
@@ -289,8 +351,10 @@ function ProductsPageContent() {
           isSearching={!!search}
         />
 
+        {/* Loading State */}
         {loading && <LoadingSpinner />}
 
+        {/* Error State */}
         {!loading && error && (
           <ErrorState
             error={error}
@@ -306,10 +370,12 @@ function ProductsPageContent() {
           />
         )}
 
+        {/* Empty State */}
         {!loading && !error && products.length === 0 && (
           <EmptyState searchQuery={search} />
         )}
 
+        {/* Products - Desktop Table */}
         {!loading && !error && products.length > 0 && (
           <div className="hidden md:block">
             <ProductTable
@@ -319,6 +385,7 @@ function ProductsPageContent() {
           </div>
         )}
 
+        {/* Products - Mobile Cards */}
         {!loading && !error && products.length > 0 && (
           <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
             {products.map((product) => (
@@ -331,6 +398,7 @@ function ProductsPageContent() {
           </div>
         )}
 
+        {/* Pagination */}
         {!loading && !error && products.length > 0 && (
           <Pagination
             currentPage={validPage}

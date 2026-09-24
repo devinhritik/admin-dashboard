@@ -14,6 +14,25 @@ export default function FilterSort({
 }) {
   const [expandedOnMobile, setExpandedOnMobile] = useState(false);
 
+  // Ensure categories is always an array and normalize object-based values
+  const safeCategories = Array.isArray(categories)
+    ? categories
+        .map((category) => {
+          if (typeof category === 'string') {
+            return { value: category, label: category };
+          }
+
+          if (category && typeof category === 'object') {
+            const value = category.slug || category.name || category.value || '';
+            if (!value) return null;
+            return { value, label: category.name || value };
+          }
+
+          return null;
+        })
+        .filter(Boolean)
+    : [];
+
   return (
     <div className="mb-6 bg-white rounded-lg shadow p-4">
       {/* Mobile Toggle Button */}
@@ -43,22 +62,11 @@ export default function FilterSort({
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
           >
             <option value="">All Categories</option>
-            {Array.isArray(categories) && categories.length > 0 ? (
-              categories.map((category) => {
-                const normalizedCategory = typeof category === 'string' ? category : category?.slug || category?.name || '';
-                const label = normalizedCategory
-                  ? normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)
-                  : 'Unknown';
-
-                return (
-                  <option key={normalizedCategory} value={normalizedCategory}>
-                    {label}
-                  </option>
-                );
-              })
-            ) : (
-              <option disabled>Loading categories...</option>
-            )}
+            {safeCategories.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label.charAt(0).toUpperCase() + category.label.slice(1)}
+              </option>
+            ))}
           </select>
 
           {/* Warning when searching */}
@@ -94,25 +102,27 @@ export default function FilterSort({
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-sm text-gray-600">Active filters:</span>
-            
+
             {selectedCategory && (
               <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
                 📁 {selectedCategory}
                 <button
                   onClick={() => onCategoryChange('')}
                   className="text-blue-600 hover:text-blue-800 font-bold"
+                  type="button"
                 >
                   ✕
                 </button>
               </span>
             )}
-            
+
             {selectedSort !== 'none' && (
               <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
                 📊 {getSortLabel(selectedSort)}
                 <button
                   onClick={() => onSortChange('none')}
                   className="text-green-600 hover:text-green-800 font-bold"
+                  type="button"
                 >
                   ✕
                 </button>
