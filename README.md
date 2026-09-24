@@ -1,4 +1,4 @@
-cat > README.md << 'EOF'
+README.md 
 # 🛍️ Product Admin Dashboard
 
 A modern, full-featured product management admin dashboard built with **Next.js 14**, **React**, **Tailwind CSS**, and **DummyJSON API**.
@@ -69,6 +69,7 @@ A modern, full-featured product management admin dashboard built with **Next.js 
 
 ## 📁 PROJECT STRUCTURE
 
+```text
 admin-dashboard/
 ├── app/
 │ ├── layout.js # Root layout with Tailwind config
@@ -113,7 +114,7 @@ admin-dashboard/
 ├── tailwind.config.js # Tailwind CSS config
 ├── next.config.js # Next.js config
 └── README.md # This file
-
+```
 
 ---
 
