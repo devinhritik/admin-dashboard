@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useState } from 'react';
 
 export default function ProductGallery({ images = [], title = '' }) {
@@ -22,11 +21,9 @@ export default function ProductGallery({ images = [], title = '' }) {
     <div className="space-y-4">
       {/* Main Image */}
       <div className="bg-gray-100 rounded-lg overflow-hidden h-96 flex items-center justify-center">
-        <Image
+        <img
           src={selectedImage}
           alt={title}
-          width={900}
-          height={600}
           className="w-full h-full object-cover"
         />
       </div>
@@ -44,11 +41,9 @@ export default function ProductGallery({ images = [], title = '' }) {
                   : 'border-gray-300 hover:border-gray-400'
               }`}
             >
-              <Image
+              <img
                 src={image}
                 alt={`${title} ${index + 1}`}
-                width={80}
-                height={80}
                 className="w-full h-full object-cover"
               />
             </button>
